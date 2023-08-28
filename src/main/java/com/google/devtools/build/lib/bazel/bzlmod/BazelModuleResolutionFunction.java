@@ -31,6 +31,8 @@ import com.google.devtools.build.lib.bazel.repository.RepositoryOptions.BazelCom
 import com.google.devtools.build.lib.bazel.repository.RepositoryOptions.CheckDirectDepsMode;
 import com.google.devtools.build.lib.events.Event;
 import com.google.devtools.build.lib.events.EventHandler;
+import com.google.devtools.build.lib.events.ExtendedEventHandler;
+import com.google.devtools.build.lib.events.StoredEventHandler;
 import com.google.devtools.build.lib.profiler.Profiler;
 import com.google.devtools.build.lib.profiler.ProfilerTask;
 import com.google.devtools.build.lib.profiler.SilentCloseable;
@@ -68,11 +70,16 @@ public class BazelModuleResolutionFunction implements SkyFunction {
     }
 
     var state = env.getState(ModuleResolutionComputeState::new);
-    if (state.selectionResult == null) {
-      state.selectionResult = discoverAndSelect(env, root);
+    try {
       if (state.selectionResult == null) {
-        return null;
+        state.storedEventHandler = new StoredEventHandler();
+        state.selectionResult = discoverAndSelect(env, root, state.storedEventHandler);
+        if (state.selectionResult == null) {
+          return null;
+        }
       }
+    } finally {
+      state.storedEventHandler.replayOn(env.getListener());
     }
 
     ImmutableSet<RepoSpecKey> repoSpecKeys =
@@ -107,7 +114,8 @@ public class BazelModuleResolutionFunction implements SkyFunction {
   }
 
   @Nullable
-  private static Selection.Result discoverAndSelect(Environment env, RootModuleFileValue root)
+  private static Selection.Result discoverAndSelect(
+      Environment env, RootModuleFileValue root, ExtendedEventHandler eventHandler)
       throws BazelModuleResolutionFunctionException, InterruptedException {
     ImmutableMap<ModuleKey, InterimModule> initialDepGraph;
     try (SilentCloseable c = Profiler.instance().profile(ProfilerTask.BZLMOD, "discovery")) {
@@ -131,7 +139,7 @@ public class BazelModuleResolutionFunction implements SkyFunction {
           initialDepGraph.get(ModuleKey.ROOT),
           resolvedDepGraph.get(ModuleKey.ROOT),
           Objects.requireNonNull(CHECK_DIRECT_DEPENDENCIES.get(env)),
-          env.getListener());
+          eventHandler);
     }
 
     try (SilentCloseable c =
@@ -139,7 +147,7 @@ public class BazelModuleResolutionFunction implements SkyFunction {
       checkBazelCompatibility(
           resolvedDepGraph.values(),
           Objects.requireNonNull(BAZEL_COMPATIBILITY_MODE.get(env)),
-          env.getListener());
+          eventHandler);
     }
 
     try (SilentCloseable c =
@@ -307,6 +315,7 @@ public class BazelModuleResolutionFunction implements SkyFunction {
 
   private static class ModuleResolutionComputeState implements Environment.SkyKeyComputeState {
     Selection.Result selectionResult;
+    StoredEventHandler storedEventHandler;
   }
 
   static class BazelModuleResolutionFunctionException extends SkyFunctionException {
