@@ -1,3 +1,199 @@
+## Release 8.6.0 (2026-02-26)
+
+```
+
+Release Notes:
+
+```
+
+## Release 10.0.0-pre.20260211.1 (2026-02-18)
+
+```
+Baseline: 6edc9a8b61395ca54794479d2e9fee47a68dd4b6
+```
+
+Important changes:
+
+  - Labels in the main repo will now have a `repr` form that reliably
+    evaluates back to themselves (that is, `repr(Label("@@//:foo"))
+    == "Label(\"@@//:foo\")"`).
+  - The `compatibility_level` and `max_compatibility_level`
+    attributes of `module` in MODULE.bazel are now no-ops. Module
+    maintainers should stop specifying those attributes and provide
+    clear build time error messages and actionable migration paths
+    when making major breaking changes.
+
+This release contains contributions from many people at Google, as well as Damian Banki, dependabot[bot], Fabian Meumertzheim, giria660.
+
+## Release 10.0.0-pre.20260204.1 (2026-02-12)
+
+```
+Baseline: 0a2574e8a302d1edc91a83fee825961a090e1573
+```
+
+Important changes:
+
+  - Bazel now fails over immediately to mirror URLs if a TLS
+    handshake error occurs.
+
+This release contains contributions from many people at Google, as well as ashutosh0x, Fabian Meumertzheim, Keith Smiley, Tyler French, Will Stranton.
+
+## Release 10.0.0-pre.20260128.2 (2026-02-06)
+
+```
+Baseline: 3ad9562ae006151d40a0ebcc90b84889888c2111
+```
+
+This release contains contributions from many people at Google, as well as Alex Eagle, Benjamin Peterson, Fabian Meumertzheim, Paul Tarjan.
+
+## Release 10.0.0-pre.20260120.1 (2026-01-29)
+
+```
+Baseline: cc1e0a6ba439764fea48e1f8035419aa44313f05
+```
+
+Incompatible changes:
+
+  - The `config_setting`s
+    `@bazel_tools//src/conditions:{host_windows,remote}` have been
+    removed. Toolchains are usually a better fit as they don't depend
+    on the configuration of the host machine running Bazel and/or
+    fixed execution modes.
+
+Important changes:
+
+  - Reporting of cached test results can now be suppressed with
+    `--test_summary=short_uncached` or
+    `--test_summary=detailed_uncached`.
+
+This release contains contributions from many people at Google, as well as Benjamin Peterson, Fabian Meumertzheim, Jordan Mele, Kapunahele Wong, Keith Smiley, Yagiz Nizipli.
+
+## Release 10.0.0-pre.20260114.1 (2026-01-22)
+
+```
+Baseline: a4e9e9774d3266b829de7e0b7e7cd75791ca3333
+```
+
+Initial release.
+
+## Release 6.6.0 (2026-01-21)
+
+```
+Baseline:  d2daa9b6fed3f38bf8e8cce90a0d17ea945c1ab7
+
+Release Notes:
+
++ Release 6.5.0 (2024-01-23)
++ Fixes for using recent Xcodes and macOS 26 (#27463)
++ Match postsubmit jobs with presubmit (#28193)
+
+Acknowledgements:
+
+This release contains contributions from many people at Google, as well as Mike Bland.
+```
+
+## Release 9.0.0 (2026-01-20)
+
+```
+
+Release Notes:
+
+```
+
+## Release 10.0.0-pre.20260112.1 (2026-01-16)
+
+```
+Baseline: 7111cbfcecdd3bda3e4beedd8b59dc93d3652607
+
+Cherry picks:
+
+   + 76166fca04ca8fdf6d87b3a2a7cf60da6ca8145b:
+     Use the hermetic python toolchain for Bazel
+```
+
+Important changes:
+
+  - The new `package_relative_label` function on the rule context
+    (`ctx`) can be used to turn a user-provided label string into a
+    `Label` relative to the target that is currently being analyzed
+    (where `Label(...)` would return a `Label` relative to the `.bzl`
+    file containing the call).
+
+This release contains contributions from many people at Google, as well as Alex Eagle, Alex O'Brien, Carmen Chui, Damian Banki, dependabot[bot], Fabian Meumertzheim, George Gensure, google-labs-jules[bot], jade.
+
+## Release 10.0.0-pre.20260104.1 (2026-01-15)
+
+```
+Baseline: 571ed6a26de82b041dedb6d30ff816c97c68e79a
+
+Cherry picks:
+
+   + 1f2624a0b0a55f692ef019c731c0a9cb8cca0638:
+     Cherry picks for 10.0.0-pre.20260104.1  (#28313)
+```
+
+Important changes:
+
+  - C static libraries can now elide backwards reference warnings (if
+    linking with LLD and such warnings are enabled) if the
+    `warn_backrefs_defined` feature is defined and enabled for the
+    toolchain.
+
+This release contains contributions from many people at Google, as well as Alex Novak, Carmen Chui, Dan Katz, Fabian Meumertzheim, gampu, Keith Smiley.
+
+## Release 10.0.0-pre.20251217.3 (2026-01-13)
+
+```
+Baseline: b9762ddb486864c29cca3aeefc30fbf391e86f14
+
+Cherry picks:
+
+   + 39ffbf0d06db539f53dc7a86b46e79f4af7845c2:
+     Automated rollback of commit
+     03ee90a351737979e3a78b48f1590ca7da7c54e9.
+   + 1d6aaa0a83a644bea11f737407e114682d693bff:
+     Internal change.
+   + aea3f208d4a5032ca28bffcddcac2e0e125a4ad0:
+     Automated rollback of commit
+     cb9bd8615210dda2104f79d281938e47187dc2de.
+   + 1b97de53d69a028536a318045a893cb34c842439:
+     Use the hermetic python toolchain for Bazel (#28287)
+```
+
+Important changes:
+
+  - `--override_repository` now supports apparent repository names
+    from the point of view of the main repository. An unknown
+    apparent repo name will result in an error.
+  - The values of keyword arguments passed to `use_repo` can now
+    contain the special substrings `{name}` and `{version}`, which
+    are treated as equivalent to the corresponding attributes of the
+    current module.
+
+This release contains contributions from many people at Google, as well as Carmen Chui, Chi Wang, David Zbarsky, Fabian Meumertzheim, Jeff Klukas, Jordan Mele, Jordan Mele, Justin Kaeser, Keith Smiley, Markus Hofbauer, Son Luong Ngoc, Timothy Gu, Will Stranton.
+
+## Release 8.5.1 (2026-01-12)
+
+```
+
+Release Notes:
+
+```
+
+## Release 10.0.0-pre.20251208.3 (2025-12-18)
+
+```
+Baseline: 9ba1edd5516721ffef3ad34e4f4c4e385e603320
+
+Cherry picks:
+
+   + e8b02043432e37af24bc063055f27ef4fa631519:
+     Automated rollback of commit
+     ed847c7929502ce6abc4eb8c3c03701059d7a579.
+```
+
+This release contains contributions from many people at Google, as well as Aaron Sky, Damian Banki, dependabot[bot], Fabian Meumertzheim, Jean-Yves LENHOF, Keith Smiley, Lucas Pottersky, Malte Poll, Will Stranton.
+
 ## Release 8.5.0 (2025-12-11)
 
 ```
