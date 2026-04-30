@@ -164,6 +164,27 @@ public final class BazelRulesModule extends BlazeModule {
 
     @Deprecated
     @Option(
+        name = "j2objc_translation_flags",
+        defaultValue = "null",
+        documentationCategory = OptionDocumentationCategory.UNDOCUMENTED,
+        effectTags = {OptionEffectTag.NO_OP},
+        metadataTags = {OptionMetadataTag.DEPRECATED},
+        allowMultiple = true,
+        help = "Deprecated. No-op.")
+    public abstract List<String> getTranslationFlags();
+
+    @Deprecated
+    @Option(
+        name = "j2objc_dead_code_report",
+        defaultValue = "null",
+        documentationCategory = OptionDocumentationCategory.UNDOCUMENTED,
+        effectTags = {OptionEffectTag.NO_OP},
+        metadataTags = {OptionMetadataTag.DEPRECATED},
+        help = "Deprecated. No-op.")
+    public abstract String getDeadCodeReport();
+
+    @Deprecated
+    @Option(
         name = "experimental_proto_extra_actions",
         defaultValue = "false",
         documentationCategory = OptionDocumentationCategory.UNDOCUMENTED,
