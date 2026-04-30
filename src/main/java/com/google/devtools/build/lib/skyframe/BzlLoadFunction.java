@@ -821,15 +821,17 @@ public class BzlLoadFunction implements SkyFunction {
     // Validate that the current .bzl file satisfies each loaded dependency's load visibility.
     // Violations are reported as error events (since there can be more than one in a single file)
     // and also trigger a BzlLoadFailedException.
-    checkLoadVisibilities(
-        pkg,
-        "module " + label.getCanonicalForm(),
-        loadValues,
-        loadKeys,
-        programLoads,
-        /* demoteErrorsToWarnings= */ !builtins.starlarkSemantics.getBool(
-            BuildLanguageOptions.CHECK_BZL_VISIBILITY),
-        env.getListener());
+    if (!ruleClassProvider.isPackageUnderExperimental(pkg)) {
+      checkLoadVisibilities(
+          pkg,
+          "module " + label.getCanonicalForm(),
+          loadValues,
+          loadKeys,
+          programLoads,
+          /* demoteErrorsToWarnings= */ !builtins.starlarkSemantics.getBool(
+              BuildLanguageOptions.CHECK_BZL_VISIBILITY),
+          env.getListener());
+    }
 
     // Accumulate a transitive digest of the bzl file, the digests of its direct loads, and the
     // digest of the @_builtins pseudo-repository (if applicable).
