@@ -131,12 +131,51 @@ public class TypesTest {
     assertNotLt(floatOrStr, intOrStr);
   }
 
+  // Application-defined Sequence subtype.
+  private static class CustomSequenceType extends Types.AbstractSequenceType {
+    @Override
+    public StarlarkType getElementType() {
+      return Types.ANY;
+    }
+  }
+
+  // Application-defined Mapping subtype.
+  private static class CustomMappingType extends Types.AbstractMappingType {
+    @Override
+    public StarlarkType getKeyType() {
+      return Types.ANY;
+    }
+
+    @Override
+    public StarlarkType getValueType() {
+      return Types.ANY;
+    }
+  }
+
   @Test
   public void assignability_collection_subtypes() {
     StarlarkType intOrStr = Types.union(Types.INT, Types.STR);
 
     assertStrictLtChain(
-        Types.list(Types.INT), Types.sequence(Types.INT), Types.collection(Types.INT));
+        Types.listRvalue(Types.NEVER), // empty list literal
+        Types.list(Types.INT),
+        Types.sequence(Types.INT),
+        Types.collection(Types.INT));
+
+    // List rvalues are assignable to any compatible list (and supertypes)
+    assertStrictLtChain(
+        Types.listRvalue(Types.INT),
+        Types.list(intOrStr),
+        Types.sequence(intOrStr),
+        Types.collection(intOrStr));
+    // ... but not to incompatible collection types (e.g. mappings, dicts, sets, or
+    // application-defined collection types).
+    assertIncomparable(Types.listRvalue(Types.ANY), Types.mapping(Types.ANY, Types.ANY));
+    assertIncomparable(Types.listRvalue(Types.ANY), Types.dict(Types.ANY, Types.ANY));
+    assertIncomparable(Types.listRvalue(Types.ANY), Types.homogeneousTuple(Types.ANY));
+    assertIncomparable(Types.listRvalue(Types.ANY), Types.set(Types.ANY));
+    assertIncomparable(Types.listRvalue(Types.ANY), new CustomSequenceType());
+    assertIncomparable(Types.listRvalue(Types.ANY), new CustomMappingType());
 
     assertStrictLtChain(
         Types.tuple(Types.INT, Types.STR, Types.INT, Types.STR),
@@ -144,14 +183,37 @@ public class TypesTest {
         Types.sequence(intOrStr),
         Types.collection(intOrStr));
 
+    // An empty tuple is assignable to any homogeneous tuple type.
+    assertStrictLtChain(
+        Types.EMPTY_TUPLE,
+        Types.homogeneousTuple(Types.ANY),
+        Types.sequence(Types.ANY),
+        Types.collection(Types.ANY));
+
     assertStrictLtChain(Types.set(Types.STR), Types.collection(Types.STR));
     assertIncomparable(Types.set(Types.STR), Types.sequence(Types.STR));
 
     assertStrictLtChain(
+        Types.dictRvalue(Types.NEVER, Types.NEVER), // empty dict literal
         Types.dict(Types.STR, Types.INT),
         Types.mapping(Types.STR, Types.INT),
         Types.collection(Types.STR));
     assertIncomparable(Types.dict(Types.STR, Types.INT), Types.sequence(Types.STR));
+
+    // Dict rvalues are assignable to any compatible dict (and supertypes)
+    assertStrictLtChain(
+        Types.dictRvalue(Types.STR, Types.INT),
+        Types.dict(intOrStr, intOrStr),
+        Types.mapping(intOrStr, intOrStr),
+        Types.collection(intOrStr));
+    // ... but not to incompatible collection types (e.g. sequences, lists, sets, or
+    // application-defined collection types).
+    assertIncomparable(Types.dictRvalue(Types.ANY, Types.ANY), Types.sequence(Types.ANY));
+    assertIncomparable(Types.dictRvalue(Types.ANY, Types.ANY), Types.list(Types.ANY));
+    assertIncomparable(Types.dictRvalue(Types.ANY, Types.ANY), Types.homogeneousTuple(Types.ANY));
+    assertIncomparable(Types.dictRvalue(Types.ANY, Types.ANY), Types.set(Types.ANY));
+    assertIncomparable(Types.dictRvalue(Types.ANY, Types.ANY), new CustomSequenceType());
+    assertIncomparable(Types.dictRvalue(Types.ANY, Types.ANY), new CustomMappingType());
 
     // Works with unions too.
     assertStrictLtChain(
@@ -161,17 +223,21 @@ public class TypesTest {
 
   @Test
   public void assignability_homogeneousCollections_covariance() {
-    // Immutable collections: covariant in element type
+    // Immutable and rvalue collections: covariant in element type
     ImmutableList<Function<StarlarkType, StarlarkType>> immutableCollectionConstructors =
-        ImmutableList.of(Types::collection, Types::sequence, Types::homogeneousTuple);
+        ImmutableList.of(
+            Types::collection, Types::sequence, Types::homogeneousTuple, Types::listRvalue);
     for (var ctor : immutableCollectionConstructors) {
       assertLtAndGt(ctor.apply(Types.INT), ctor.apply(Types.ANY));
       assertIncomparable(ctor.apply(Types.INT), ctor.apply(Types.FLOAT));
       assertStrictLtChain(
-          ctor.apply(Types.INT), ctor.apply(Types.NUMERIC), ctor.apply(Types.OBJECT));
+          ctor.apply(Types.NEVER),
+          ctor.apply(Types.INT),
+          ctor.apply(Types.NUMERIC),
+          ctor.apply(Types.OBJECT));
     }
 
-    // Mutable collections: invariant in element type
+    // Mutable collections: invariant in element type.
     ImmutableList<Function<StarlarkType, StarlarkType>> mutableCollectionConstructors =
         ImmutableList.of(Types::list, Types::set);
     for (var ctor : mutableCollectionConstructors) {

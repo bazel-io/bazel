@@ -193,7 +193,7 @@ public final class TypeChecker extends NodeVisitor {
         }
         return list.isTuple()
             ? Types.tuple(ImmutableList.copyOf(elementTypes))
-            : Types.list(Types.union(elementTypes));
+            : Types.listRvalue(Types.union(elementTypes));
       }
       case DICT_EXPR -> {
         var dict = (DictExpression) expr;
@@ -203,9 +203,11 @@ public final class TypeChecker extends NodeVisitor {
           keyTypes.add(infer(entry.getKey()));
           valueTypes.add(infer(entry.getValue()));
         }
-        return Types.dict(Types.union(keyTypes), Types.union(valueTypes));
+        return Types.dictRvalue(Types.union(keyTypes), Types.union(valueTypes));
       }
       case CALL -> {
+        // TODO: #27370 - we could special-case set literals; e.g. check if a call expression is
+        // `set()`, verifying using typeContext that `set` is the set type constructor.
         return inferCall((CallExpression) expr);
       }
       case CONDITIONAL -> {
@@ -595,8 +597,7 @@ public final class TypeChecker extends NodeVisitor {
     ImmutableList<StarlarkType> argTypes =
         call.getArguments().stream()
             .limit(numArgs)
-            .map(Argument::getValue)
-            .map(this::infer)
+            .map(arg -> infer(arg.getValue()))
             .collect(toImmutableList());
 
     ImmutableCollection<StarlarkType> callFunctionTypes = Types.unfoldUnion(callFunctionType);
@@ -1045,7 +1046,7 @@ public final class TypeChecker extends NodeVisitor {
 
     if (lhs instanceof Identifier id && typeTable.getType(id.getBinding()) == null) {
       // If a variable has not been typed, infer its type from the rhs of the first assignment.
-      typeTable.setInferredType(id.getBinding(), rhsType);
+      typeTable.setInferredType(id.getBinding(), rhsType.toLvalue());
     }
   }
 
@@ -1226,9 +1227,6 @@ public final class TypeChecker extends NodeVisitor {
       }
     } else {
 
-      // TODO: #27370 - Do bidirectional inference, passing down information about the expected type
-      // from the LHS to the infer() call here, e.g. to construct the type of `[1, 2, 3]` as
-      // list[int] instead of list[object].
       var rhsType = infer(assignment.getRHS());
 
       assign(assignment.getLHS(), rhsType);

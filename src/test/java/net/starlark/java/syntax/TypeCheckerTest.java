@@ -22,6 +22,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ObjectArrays;
 import java.util.Objects;
 import net.starlark.java.syntax.Resolver.Module;
@@ -241,6 +242,79 @@ public final class TypeCheckerTest {
   }
 
   @Test
+  public void assignment_to_immutable_supertype() throws Exception {
+    assertValid(
+        """
+        list_lvalue: list[int]
+        dict_lvalue: dict[str, int]
+
+        a: object = list_lvalue
+        b: Sequence[int] = list_lvalue
+        c: Collection[int|float|str] = list_lvalue  # immutable collections covariant
+        d: Mapping[str, int|float] = dict_lvalue  # Mapping (not dict!) covariant in value
+        e: Collection[str|int] = dict_lvalue  # as keys
+        f: tuple[int, ...] = ()
+        """);
+  }
+
+  @Test
+  public void assignment_rvalue_inference() throws Exception {
+    // Empty list literals can be assigned to a target of any collection type, and empty dict
+    // literals can be assigned to any mapping type (recursively).
+    assertValid(
+        """
+        a: list[int] = []
+        b: Sequence[str] = []
+        c: Collection[bool] = []
+        d: dict[str, int] = {}
+        e: Mapping[str, int] = {}
+        f: Collection[str] = {}  # as collection of keys
+        """);
+
+    // Non-empty list/dict rvalues can be assigned to covariant mutable list/dict types
+    // (recursively)
+    assertValid(
+        """
+        g: list[int|float] = [1, 2, 3] + [4, 5, 6]
+        h: list[list[int]|dict[str, str]] = [[]] if 1 == 0 else [{}]
+        """);
+
+    // ... but not to incompatible ones.
+    assertInvalid(
+        ":1:1: cannot assign type 'list[int]' to 'x' of type 'list[float]'",
+        """
+        x: list[float] = [1, 2, 3]
+        y: dict[str, int] = {'a': 1.0}
+        """);
+
+    // If the LHS is untyped, it's inferred to be the recursively lvalue version of the RHS type.
+    assertTypeAfterTypecheck(
+        "x",
+        Types.list(Types.INT), // not Types.listRvalue
+        """
+        x = [1, 2, 3]
+        _: Any  # ensure toplevel code is type-checked
+        """);
+    assertTypeAfterTypecheck(
+        "x",
+        Types.dict(Types.STR, Types.INT), // not Types.listRvalue
+        """
+        x = {'a': 1}
+        _: Any  # ensure toplevel code is type-checked
+        """);
+    assertTypeAfterTypecheck(
+        "x",
+        // Not Types.listRvalue or Types.dictRvalue
+        Types.union(
+            Types.list(Types.dict(Types.STR, Types.INT)),
+            Types.dict(Types.STR, Types.list(Types.INT))),
+        """
+        x = [{'a': 1}] if 1 == 0 else {'b': [2, 3]}
+        _: Any  # ensure toplevel code is type-checked
+        """);
+  }
+
+  @Test
   public void sequence_assignment() throws Exception {
     assertValid(
         """
@@ -334,6 +408,17 @@ public final class TypeCheckerTest {
         """
         _: Any  # ensure toplevel code is type-checked
         x, x[0] = ((1,), 2)
+        """);
+  }
+
+  @Test
+  public void sequence_assignment_rvalue_inference() throws Exception {
+    assertValid(
+        """
+        x: list[int|str]
+        y: tuple[list[int|str], dict[int|str, int|str]]
+        x, y = [], ([], {})
+        x, y = ["a", "b"], ([1, 2], {"a": "b"})
         """);
   }
 
@@ -1018,27 +1103,27 @@ public final class TypeCheckerTest {
   @Test
   public void infer_dict() throws Exception {
     // Empty case.
-    assertTypeGivenDecls("{}", Types.dict(Types.NEVER, Types.NEVER));
+    assertTypeGivenDecls("{}", Types.dictRvalue(Types.NEVER, Types.NEVER));
 
     // Homogeneous case.
-    assertTypeGivenDecls("{'a': 1, 'b': 2}", Types.dict(Types.STR, Types.INT));
+    assertTypeGivenDecls("{'a': 1, 'b': 2}", Types.dictRvalue(Types.STR, Types.INT));
 
     // Heterogeneous case.
     StarlarkType unionType = Types.union(Types.STR, Types.INT);
-    assertTypeGivenDecls("{'a': 'abc', 1: 123}", Types.dict(unionType, unionType));
+    assertTypeGivenDecls("{'a': 'abc', 1: 123}", Types.dictRvalue(unionType, unionType));
   }
 
   @Test
   public void infer_list() throws Exception {
     // Empty case.
-    assertTypeGivenDecls("[]", Types.list(Types.NEVER));
+    assertTypeGivenDecls("[]", Types.listRvalue(Types.NEVER));
 
     // Homogeneous case.
-    assertTypeGivenDecls("[1, 2, 3]", Types.list(Types.INT));
+    assertTypeGivenDecls("[1, 2, 3]", Types.listRvalue(Types.INT));
 
     // Heterogeneous case.
     StarlarkType unionType = Types.union(Types.INT, Types.STR);
-    assertTypeGivenDecls("[1, 'a']", Types.list(unionType));
+    assertTypeGivenDecls("[1, 'a']", Types.listRvalue(unionType));
   }
 
   @Test
@@ -1179,11 +1264,12 @@ public final class TypeCheckerTest {
 
     // concatenation
     assertTypeGivenDecls("'hello' + 'world'", Types.STR);
-    assertTypeGivenDecls("[] + []", Types.list(Types.NEVER));
-    assertTypeGivenDecls("[] + [1]", Types.list(Types.INT));
-    assertTypeGivenDecls("['hello'] + []", Types.list(Types.STR));
+    assertTypeGivenDecls("[] + []", Types.listRvalue(Types.NEVER));
+    assertTypeGivenDecls("[] + [1]", Types.listRvalue(Types.INT));
+    assertTypeGivenDecls("['hello'] + []", Types.listRvalue(Types.STR));
     assertTypeGivenDecls(
-        "[1, 2.0] + [3, 'four']", Types.list(Types.union(Types.INT, Types.FLOAT, Types.STR)));
+        "[1, 2.0] + [3, 'four']", Types.listRvalue(Types.union(Types.INT, Types.FLOAT, Types.STR)));
+    assertTypeGivenDecls("x + y", Types.listRvalue(Types.INT), "x: list[int]; y: list[int]");
     assertTypeGivenDecls(
         "x + y",
         Types.tuple(Types.INT, Types.FLOAT, Types.INT, Types.STR),
@@ -1237,7 +1323,7 @@ public final class TypeCheckerTest {
     assertTypeGivenDecls("x | y", Types.INT, "x: int; y: int");
     assertTypeGivenDecls(
         "x | y",
-        Types.dict(Types.union(Types.STR, Types.INT), Types.union(Types.BOOL, Types.FLOAT)),
+        Types.dictRvalue(Types.union(Types.STR, Types.INT), Types.union(Types.BOOL, Types.FLOAT)),
         "x: dict[str, bool]; y: dict[int, float]");
     assertTypeGivenDecls(
         "x | y", Types.set(Types.union(Types.INT, Types.STR)), "x: set[int]; y: set[str]");
@@ -1377,12 +1463,12 @@ public final class TypeCheckerTest {
     assertTypeGivenDecls("2 * 'bye'", Types.STR);
 
     // list repetition
-    assertTypeGivenDecls("[1, 2.0] * 2", Types.list(Types.union(Types.INT, Types.FLOAT)));
-    assertTypeGivenDecls("2 * [1, 2.0]", Types.list(Types.union(Types.INT, Types.FLOAT)));
+    assertTypeGivenDecls("[1, 2.0] * 2", Types.listRvalue(Types.union(Types.INT, Types.FLOAT)));
+    assertTypeGivenDecls("2 * [1, 2.0]", Types.listRvalue(Types.union(Types.INT, Types.FLOAT)));
     // preserve list type even when the returned list is size 0
-    assertTypeGivenDecls("[1, 2.0] * 0", Types.list(Types.union(Types.INT, Types.FLOAT)));
-    assertTypeGivenDecls("0 * [1, 2.0]", Types.list(Types.union(Types.INT, Types.FLOAT)));
-    assertTypeGivenDecls("x * y", Types.list(Types.INT), "x: int; y: list[int]");
+    assertTypeGivenDecls("[1, 2.0] * 0", Types.listRvalue(Types.union(Types.INT, Types.FLOAT)));
+    assertTypeGivenDecls("0 * [1, 2.0]", Types.listRvalue(Types.union(Types.INT, Types.FLOAT)));
+    assertTypeGivenDecls("x * y", Types.listRvalue(Types.INT), "x: int; y: list[int]");
 
     // tuple repetition
     assertTypeGivenDecls(
@@ -1610,6 +1696,16 @@ public final class TypeCheckerTest {
             return 0
         X: int | str
         Y: Any
+        """);
+
+    // Infer types of list/dict literals in argument values (same mechanism as rvalue inference
+    // for assignments)
+    assertValid(
+        """
+        def f(x: list[int|str], y: dict[str|int, int|float]) -> None:
+            pass
+        f([], {})
+        f([1, 2, 3], {"a": 1, "b": 2})
         """);
 
     // Cannot call a non-callable
@@ -1911,6 +2007,26 @@ public final class TypeCheckerTest {
   @Test
   public void def_argument_defaults() throws Exception {
     assertValid("def f(x: int = 42, y: str= '', z = {}): pass");
+    // Allow list/dict literal defaults (same mechanism as rvalue inference for assignments)
+    assertValid(
+        """
+        def f(x: list[int] = [], y: dict[str, float] = {}): pass
+
+        def g(x: list[int|float] = [1, 2, 3], y: dict[str|int, int|float] = {"pi": 3.14}): pass
+        """);
+    // ... but the default's type does not cause the argument's type to be inferred
+    assertTypeAfterTypecheck(
+        "f",
+        Types.callable(
+            ImmutableList.of("x", "y"),
+            ImmutableList.of(Types.ANY, Types.ANY), // not list[int] or dict[str, float]
+            0,
+            2,
+            ImmutableSet.of(),
+            null,
+            null,
+            Types.NONE),
+        "def f(x = [1, 2, 3], y = {'pi': 3.14}) -> None: pass");
     String invalid = "def f(x: int = 42.0, y: str = 43, z = []): pass";
     assertInvalid("f(): parameter 'x' has default value of type 'float', declares 'int'", invalid);
     assertInvalid("f(): parameter 'y' has default value of type 'int', declares 'str'", invalid);
@@ -1938,6 +2054,21 @@ public final class TypeCheckerTest {
                 return 42.0
             else:
                 return 'abc'
+        """);
+    // Infer list/dict literal returns (same mechanism as rvalue inference for assignments)
+    assertValid(
+        """
+        def f() -> list[int]:
+            return []
+
+        def g() -> list[int|float]:
+            return [1, 2, 3]
+
+        def h() -> dict[str, int|float]:
+            return {}
+
+        def i() -> dict[str|int, int|float]:
+            return {"pi": 3.14}
         """);
 
     assertInvalid(
