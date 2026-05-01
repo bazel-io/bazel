@@ -322,6 +322,8 @@ public abstract class MockCcSupport {
         TestConstants.RULES_CC_REPOSITORY_EXECROOT + "BUILD",
         "filegroup(name='license', visibility=['//visibility:public'])");
     config.create(TestConstants.TOOLS_REPOSITORY_SCRATCH + "tools/build_defs/cc/BUILD");
+    config.create(
+        TestConstants.TOOLS_REPOSITORY_SCRATCH + "third_party/gloop/tools/build_defs/cc/BUILD");
     config.append(TestConstants.TOOLS_REPOSITORY_SCRATCH + "tools/cpp/BUILD", "");
 
     // These could be a distinct method
