@@ -173,7 +173,13 @@ public class RequestBatcher<RequestT, ResponseT> {
    *
    * <p>Used with {@link CallbackMultiplexer}.
    */
-  public interface ResponseSink<ResponseT> {
+  public interface ResponseSink<RequestT, ResponseT> {
+    /** Returns the original request associated with this sink. */
+    RequestT request();
+
+    /** Returns true if the sink has been completed (success or failure). */
+    boolean isDone();
+
     /**
      * Fulfills the corresponding request with a successful response.
      *
@@ -217,7 +223,7 @@ public class RequestBatcher<RequestT, ResponseT> {
      *     batch could possibly use them. The callback should be lightweight.
      */
     Runnable execute(
-        List<RequestT> requests, ImmutableList<? extends ResponseSink<ResponseT>> sinks);
+        List<RequestT> requests, ImmutableList<? extends ResponseSink<RequestT, ResponseT>> sinks);
   }
 
   /**
@@ -254,7 +260,7 @@ public class RequestBatcher<RequestT, ResponseT> {
     return new PerResponseMultiplexerAdapter<>(multiplexer);
   }
 
-  private interface BatchExecutionStrategy<RequestT, ResponseT> {
+  interface BatchExecutionStrategy<RequestT, ResponseT> {
     ListenableFuture<?> executeBatch(
         List<RequestT> requests, ImmutableList<Operation<RequestT, ResponseT>> operations);
   }
@@ -466,7 +472,7 @@ public class RequestBatcher<RequestT, ResponseT> {
 
   @VisibleForTesting
   static final class Operation<RequestT, ResponseT> extends AbstractFuture<ResponseT>
-      implements ResponseSink<ResponseT>, FutureResponseSink<ResponseT> {
+      implements ResponseSink<RequestT, ResponseT>, FutureResponseSink<ResponseT> {
     private final RequestT request;
     private boolean isFutureSet = false;
 
@@ -474,7 +480,8 @@ public class RequestBatcher<RequestT, ResponseT> {
       this.request = request;
     }
 
-    private RequestT request() {
+    @Override
+    public RequestT request() {
       return request;
     }
 
