@@ -162,7 +162,7 @@ public abstract class RemoteAnalysisCachingOptions extends OptionsBase {
       name = "experimental_remote_analysis_cache_deadline",
       documentationCategory = OptionDocumentationCategory.UNDOCUMENTED,
       effectTags = {OptionEffectTag.BAZEL_INTERNAL_CONFIGURATION},
-      defaultValue = "120s",
+      defaultValue = "45s",
       converter = DurationConverter.class,
       help = "Deadline to use for remote analysis cache operations.")
   public abstract Duration getDeadline();
