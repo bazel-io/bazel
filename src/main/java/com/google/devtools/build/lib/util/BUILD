@@ -103,7 +103,24 @@ java_library(
 java_library(
     name = "debug-logger-configurator",
     srcs = ["DebugLoggerConfigurator.java"],
-    deps = [":util"],
+)
+
+java_library(
+    name = "server_log_path_service",
+    srcs = ["ServerLogPathService.java"],
+    deps = [
+        "//src/main/java/com/google/devtools/build/lib/runtime:blaze_service",
+        "//src/main/java/com/google/devtools/build/lib/skybridge:skybridge_interface",
+    ],
+)
+
+java_library(
+    name = "server_log_path_service_impl",
+    srcs = ["ServerLogPathServiceImpl.java"],
+    deps = [
+        ":server_log_path_service",
+        ":util",
+    ],
 )
 
 java_library(
