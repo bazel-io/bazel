@@ -392,6 +392,10 @@ public class RequestBatcher<RequestT, ResponseT> {
     }
   }
 
+  public int maxConcurrentRequests() {
+    return maxConcurrentRequests;
+  }
+
   // TODO: b/386384684 - remove Unsafe usage
   @Override
   public String toString() {
