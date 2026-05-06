@@ -170,7 +170,7 @@ public final class SelectorList implements StarlarkValue, HasBinary {
   }
 
   private static TokenKind binaryOpToken(Object value) {
-    return getNativeType(value).equals(Dict.class) ? TokenKind.PIPE : TokenKind.PLUS;
+    return Dict.class.isAssignableFrom(getNativeType(value)) ? TokenKind.PIPE : TokenKind.PLUS;
   }
 
   @Override

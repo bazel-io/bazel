@@ -58,7 +58,7 @@ import net.starlark.java.syntax.Types;
  * void clear()         -- use clearEntries
  * V put(K, V)          -- use putEntry
  * void putAll(Map)     -- use putEntries
- * V remove(Object key) -- use removeEntry
+ * V remove(Object key) -- use pop
  * </pre>
  */
 @StarlarkBuiltin(
@@ -107,7 +107,7 @@ import net.starlark.java.syntax.Types;
             + "d = {\"a\": 1, \"b\": 2}\n"
             + "d |= {\"b\": 3, \"c\": 4}\n"
             + "# d == {\"a\": 1, \"b\": 3, \"c\": 4}</pre></ol>")
-public class Dict<K, V>
+public abstract sealed class Dict<K, V>
     implements Map<K, V>,
         StarlarkValue,
         Mutability.Freezable,
@@ -119,33 +119,9 @@ public class Dict<K, V>
   }
 
   private final Map<K, V> contents;
-  // Number of active iterators (unused once frozen).
-  private transient int iteratorCount; // transient for serialization by Bazel
 
-  /** Final except for {@link #unsafeShallowFreeze}; must not be modified any other way. */
-  private Mutability mutability;
-
-  private Dict(Mutability mutability, LinkedHashMap<K, V> contents) {
-    Preconditions.checkNotNull(mutability);
-    Preconditions.checkState(mutability != Mutability.IMMUTABLE);
-    this.mutability = mutability;
-    // TODO(bazel-team): Memory optimization opportunity: Make it so that a call to
-    // `mutability.freeze()` causes `contents` here to become an ImmutableMap. Benchmarks show that
-    // for many targets, this can save a small amount of retained heap (up to 1%). But for some
-    // targets the bookkeeping required for this causes unacceptably increased temporary heap, and
-    // the CPU overhead of the bookkeeping and the CPU cost of the ImmutableMap#copyOf call cause
-    // unacceptably increased CPU. In other words, the overall tradeoff is not obviously worth it
-    // in all cases. So be careful making this optimization! See comment #12 of b/225469491 for
-    // details.
-    this.contents = contents;
-  }
-
-  private Dict(ImmutableMap<K, V> contents) {
-    // An immutable dict might as well store its contents as an ImmutableMap, since ImmutableMap
-    // both is more memory-efficient than LinkedHashMap and also it has the requisite deterministic
-    // iteration order.
-    this.mutability = Mutability.IMMUTABLE;
-    this.contents = contents;
+  private Dict(Map<K, V> contents) {
+    this.contents = Preconditions.checkNotNull(contents);
   }
 
   @Override
@@ -172,52 +148,42 @@ public class Dict<K, V>
     if (mu == Mutability.IMMUTABLE && contents.isEmpty()) {
       return empty();
     }
-    // #wrap is used in situations where the resulting Dict isn't necessarily retained [forever].
-    // So, don't make an ImmutableMap copy of `contents`, as #copyOf would do.
-    return new Dict<>(mu, contents);
+
+    // TODO: b/507408768 - Can we get Mutability.IMMUTABLE here? If so, consider ImmutableDict.
+    return new MutableDict<>(mu, contents);
   }
 
   @Override
-  public boolean truth() {
+  public final boolean truth() {
     return !isEmpty();
   }
 
   @Override
-  public boolean isImmutable() {
+  public final boolean isImmutable() {
     return mutability().isFrozen();
   }
 
   @Override
-  public boolean updateIteratorCount(int delta) {
-    if (mutability().isFrozen()) {
-      return false;
-    }
-    if (delta > 0) {
-      iteratorCount++;
-    } else if (delta < 0) {
-      iteratorCount--;
-    }
-    return iteratorCount > 0;
-  }
+  public abstract boolean updateIteratorCount(int delta);
 
   @Override
-  public void checkHashable() throws EvalException {
+  public final void checkHashable() throws EvalException {
     // Even a frozen dict is unhashable.
     throw Starlark.errorf("unhashable type: 'dict'");
   }
 
   @Override
-  public int hashCode() {
+  public final int hashCode() {
     return contents.hashCode();
   }
 
   @Override
-  public boolean equals(Object o) {
+  public final boolean equals(Object o) {
     return contents.equals(o);
   }
 
   @Override
-  public Iterator<K> iterator() {
+  public final Iterator<K> iterator() {
     return keySet().iterator();
   }
 
@@ -239,7 +205,8 @@ public class Dict<K, V>
   // TODO(adonovan): This method is named get2 as a temporary workaround for a bug in
   // StarlarkAnnotations.getStarlarkMethod. The two 'get' methods cause it to get
   // confused as to which one has the annotation. Fix it and remove "2" suffix.
-  public Object get2(Object key, Object defaultValue, StarlarkThread thread) throws EvalException {
+  public final Object get2(Object key, Object defaultValue, StarlarkThread thread)
+      throws EvalException {
     Object v = this.get(key);
     if (v != null) {
       return v;
@@ -269,7 +236,8 @@ public class Dict<K, V>
             doc = "a default value if the key is absent."),
       },
       useStarlarkThread = true)
-  public Object pop(Object key, Object defaultValue, StarlarkThread thread) throws EvalException {
+  public final Object pop(Object key, Object defaultValue, StarlarkThread thread)
+      throws EvalException {
     Starlark.checkMutable(this);
     Object value = contents.remove(key);
     if (value != null) {
@@ -292,7 +260,7 @@ public class Dict<K, V>
               + "<code>popitem</code> is useful to destructively iterate over a dictionary, "
               + "as often used in set algorithms. "
               + "If the dictionary is empty, the <code>popitem</code> call fails.")
-  public Tuple popitem() throws EvalException {
+  public final Tuple popitem() throws EvalException {
     if (isEmpty()) {
       throw Starlark.errorf("popitem: empty dictionary");
     }
@@ -320,7 +288,7 @@ public class Dict<K, V>
             named = true,
             doc = "a default value if the key is absent."),
       })
-  public V setdefault(K key, V defaultValue) throws EvalException {
+  public final V setdefault(K key, V defaultValue) throws EvalException {
     Starlark.checkMutable(this);
     Starlark.checkHashable(key);
 
@@ -349,7 +317,7 @@ public class Dict<K, V>
       },
       extraKeywords = @Param(name = "kwargs", doc = "Dictionary of additional entries."),
       useStarlarkThread = true)
-  public void update(Object pairs, Dict<String, Object> kwargs, StarlarkThread thread)
+  public final void update(Object pairs, Dict<String, Object> kwargs, StarlarkThread thread)
       throws EvalException {
     Starlark.checkMutable(this);
     @SuppressWarnings("unchecked")
@@ -400,7 +368,7 @@ public class Dict<K, V>
               + "<pre class=\"language-python\">"
               + "{2: \"a\", 4: \"b\", 1: \"c\"}.values() == [\"a\", \"b\", \"c\"]</pre>\n",
       useStarlarkThread = true)
-  public StarlarkList<?> values0(StarlarkThread thread) throws EvalException {
+  public final StarlarkList<?> values0(StarlarkThread thread) {
     return StarlarkList.copyOf(thread.mutability(), values());
   }
 
@@ -412,7 +380,7 @@ public class Dict<K, V>
               + "{2: \"a\", 4: \"b\", 1: \"c\"}.items() == [(2, \"a\"), (4, \"b\"), (1, \"c\")]"
               + "</pre>\n",
       useStarlarkThread = true)
-  public StarlarkList<?> items(StarlarkThread thread) throws EvalException {
+  public final StarlarkList<?> items(StarlarkThread thread) {
     Object[] array = new Object[size()];
     int i = 0;
     for (Map.Entry<?, ?> e : contents.entrySet()) {
@@ -428,7 +396,7 @@ public class Dict<K, V>
               + "<pre class=\"language-python\">{2: \"a\", 4: \"b\", 1: \"c\"}.keys() == [2, 4, 1]"
               + "</pre>\n",
       useStarlarkThread = true)
-  public StarlarkList<?> keys(StarlarkThread thread) throws EvalException {
+  public final StarlarkList<?> keys(StarlarkThread thread) {
     Object[] array = new Object[size()];
     int i = 0;
     for (K e : contents.keySet()) {
@@ -437,13 +405,11 @@ public class Dict<K, V>
     return StarlarkList.wrap(thread.mutability(), array);
   }
 
-  private static final Dict<?, ?> EMPTY = new Dict<>(ImmutableMap.of());
-
   /** Returns an immutable empty dict. */
   // Safe because the empty singleton is immutable.
   @SuppressWarnings("unchecked")
   public static <K, V> Dict<K, V> empty() {
-    return (Dict<K, V>) EMPTY;
+    return (Dict<K, V>) ImmutableDict.EMPTY;
   }
 
   /** Returns a new empty dict with the specified mutability. */
@@ -454,7 +420,7 @@ public class Dict<K, V>
     if (mu == Mutability.IMMUTABLE) {
       return empty();
     } else {
-      return new Dict<>(mu, Maps.newLinkedHashMapWithExpectedSize(1));
+      return new MutableDict<>(mu, Maps.newLinkedHashMapWithExpectedSize(1));
     }
   }
 
@@ -477,7 +443,7 @@ public class Dict<K, V>
             });
         @SuppressWarnings("unchecked")
         ImmutableMap<K, V> immutableMap = (ImmutableMap<K, V>) m;
-        return new Dict<>(immutableMap);
+        return new ImmutableDict<>(immutableMap);
       }
 
       if (m instanceof Dict && ((Dict<?, ?>) m).isImmutable()) {
@@ -489,11 +455,11 @@ public class Dict<K, V>
       ImmutableMap.Builder<K, V> immutableMapBuilder =
           ImmutableMap.builderWithExpectedSize(m.size());
       m.forEach((k, v) -> immutableMapBuilder.put(Starlark.checkValid(k), Starlark.checkValid(v)));
-      return new Dict<>(immutableMapBuilder.buildOrThrow());
+      return new ImmutableDict<>(immutableMapBuilder.buildOrThrow());
     } else {
       LinkedHashMap<K, V> linkedHashMap = Maps.newLinkedHashMapWithExpectedSize(m.size());
       m.forEach((k, v) -> linkedHashMap.put(Starlark.checkValid(k), Starlark.checkValid(v)));
-      return new Dict<>(mu, linkedHashMap);
+      return new MutableDict<>(mu, linkedHashMap);
     }
   }
 
@@ -552,9 +518,9 @@ public class Dict<K, V>
         if (items.isEmpty()) {
           return empty();
         }
-        return new Dict<>(buildImmutableMap());
+        return new ImmutableDict<>(buildImmutableMap());
       } else {
-        return new Dict<>(mu, buildLinkedHashMap());
+        return new MutableDict<>(mu, buildLinkedHashMap());
       }
     }
 
@@ -585,14 +551,8 @@ public class Dict<K, V>
   }
 
   @Override
-  public Mutability mutability() {
-    return mutability;
-  }
-
-  @Override
   public void unsafeShallowFreeze() {
     Mutability.Freezable.checkUnsafeShallowFreezePrecondition(this);
-    this.mutability = Mutability.IMMUTABLE;
   }
 
   /**
@@ -602,7 +562,7 @@ public class Dict<K, V>
    * @param value the value of the added entry
    * @throws EvalException if the key is invalid or the dict is frozen
    */
-  public void putEntry(K key, V value) throws EvalException {
+  public final void putEntry(K key, V value) throws EvalException {
     Starlark.checkMutable(this);
     Starlark.checkHashable(key);
     contents.put(key, value);
@@ -614,7 +574,7 @@ public class Dict<K, V>
    * @param map the map whose entries are added
    * @throws EvalException if some key is invalid or the dict is frozen
    */
-  public <K2 extends K, V2 extends V> void putEntries(Map<K2, V2> map) throws EvalException {
+  public final <K2 extends K, V2 extends V> void putEntries(Map<K2, V2> map) throws EvalException {
     Starlark.checkMutable(this);
     for (Map.Entry<K2, V2> e : map.entrySet()) {
       K2 k = e.getKey();
@@ -624,35 +584,23 @@ public class Dict<K, V>
   }
 
   /**
-   * Deletes the entry associated with the given key.
-   *
-   * @param key the key to delete
-   * @return the value associated to the key, or {@code null} if not present
-   * @throws EvalException if the dict is frozen
-   */
-  V removeEntry(Object key) throws EvalException {
-    Starlark.checkMutable(this);
-    return contents.remove(key);
-  }
-
-  /**
    * Clears the dict.
    *
    * @throws EvalException if the dict is frozen
    */
   @StarlarkMethod(name = "clear", doc = "Remove all items from the dictionary.")
-  public void clearEntries() throws EvalException {
+  public final void clearEntries() throws EvalException {
     Starlark.checkMutable(this);
     contents.clear();
   }
 
   @Override
-  public void repr(Printer printer, StarlarkSemantics semantics) {
+  public final void repr(Printer printer, StarlarkSemantics semantics) {
     printer.printList(entrySet(), "{", ", ", "}", semantics);
   }
 
   @Override
-  public String toString() {
+  public final String toString() {
     return Starlark.repr(this, StarlarkSemantics.DEFAULT);
   }
 
@@ -696,7 +644,7 @@ public class Dict<K, V>
   }
 
   @Override
-  public Object getIndex(StarlarkSemantics semantics, Object key) throws EvalException {
+  public final Object getIndex(StarlarkSemantics semantics, Object key) throws EvalException {
     Object v = get(key);
     if (v == null) {
       throw Starlark.errorf("key %s not found in dictionary", Starlark.repr(key, semantics));
@@ -718,7 +666,7 @@ public class Dict<K, V>
   }
 
   @Override
-  public boolean containsValue(Object value) {
+  public final boolean containsValue(Object value) {
     return contents.containsValue(value);
   }
 
@@ -734,7 +682,7 @@ public class Dict<K, V>
   }
 
   @Override
-  public boolean isEmpty() {
+  public final boolean isEmpty() {
     return contents.isEmpty();
   }
 
@@ -744,12 +692,12 @@ public class Dict<K, V>
   }
 
   @Override
-  public int size() {
+  public final int size() {
     return contents.size();
   }
 
   @Override
-  public Collection<V> values() {
+  public final Collection<V> values() {
     return Collections.unmodifiableMap(contents).values();
   }
 
@@ -761,28 +709,95 @@ public class Dict<K, V>
 
   @Deprecated // use clearEntries
   @Override
-  public void clear() {
+  public final void clear() {
     throw new UnsupportedOperationException();
   }
 
   @Nullable
   @Deprecated // use putEntry
   @Override
-  public V put(K key, V value) {
+  public final V put(K key, V value) {
     throw new UnsupportedOperationException();
   }
 
   @Deprecated // use putEntries
   @Override
-  public void putAll(Map<? extends K, ? extends V> map) {
+  public final void putAll(Map<? extends K, ? extends V> map) {
     throw new UnsupportedOperationException();
   }
 
   @Nullable
-  @Deprecated // use removeEntry
+  @Deprecated // use pop
   @Override
-  public V remove(Object key) {
+  public final V remove(Object key) {
     throw new UnsupportedOperationException();
+  }
+
+  /** A {@link Dict} that is mutable until its {@link #mutability()} is frozen. */
+  // TODO(bazel-team): Memory optimization opportunity: Make it so that a call to
+  // `mutability.freeze()` causes `contents` here to become an ImmutableMap. Benchmarks show that
+  // for many targets, this can save a small amount of retained heap (up to 1%). But for some
+  // targets the bookkeeping required for this causes unacceptably increased temporary heap, and the
+  // CPU overhead of the bookkeeping and the CPU cost of the ImmutableMap#copyOf call cause
+  // unacceptably increased CPU. In other words, the overall tradeoff is not obviously worth it in
+  // all cases. So be careful making this optimization! See comment #12 of b/225469491 for details.
+  private static final class MutableDict<K, V> extends Dict<K, V> {
+    // Number of active iterators (unused once frozen).
+    private transient int iteratorCount; // transient for serialization by Bazel
+
+    /** Final except for {@link #unsafeShallowFreeze}; must not be modified any other way. */
+    private Mutability mutability;
+
+    MutableDict(Mutability mutability, LinkedHashMap<K, V> contents) {
+      super(contents);
+      Preconditions.checkNotNull(mutability);
+      Preconditions.checkArgument(mutability != Mutability.IMMUTABLE, mutability);
+      this.mutability = mutability;
+    }
+
+    @Override
+    public Mutability mutability() {
+      return mutability;
+    }
+
+    @Override
+    public void unsafeShallowFreeze() {
+      super.unsafeShallowFreeze();
+      this.mutability = Mutability.IMMUTABLE;
+    }
+
+    @Override
+    public boolean updateIteratorCount(int delta) {
+      if (mutability.isFrozen()) {
+        return false;
+      }
+      if (delta > 0) {
+        iteratorCount++;
+      } else if (delta < 0) {
+        iteratorCount--;
+      }
+      return iteratorCount > 0;
+    }
+  }
+
+  /** A deeply immutable {@link Dict}. */
+  private static sealed class ImmutableDict<K, V> extends Dict<K, V> {
+
+    private static final Dict<?, ?> EMPTY = new ImmutableDict<>(ImmutableMap.of());
+
+    ImmutableDict(ImmutableMap<K, V> contents) {
+      super(contents);
+    }
+
+    @Override
+    public final Mutability mutability() {
+      return Mutability.IMMUTABLE;
+    }
+
+    @Override
+    public final boolean updateIteratorCount(int delta) {
+      return false;
+    }
   }
 
   /**
@@ -792,7 +807,7 @@ public class Dict<K, V>
    * conservatively results in all keys being considered as accessed - notably, this happens with
    * iteration, {@link #repr}, and a mutable copy.
    */
-  public static final class ImmutableKeyTrackingDict<K, V> extends Dict<K, V> {
+  public static final class ImmutableKeyTrackingDict<K, V> extends ImmutableDict<K, V> {
     private final ImmutableSet.Builder<K> accessedKeys = ImmutableSet.builder();
 
     private ImmutableKeyTrackingDict(ImmutableMap<K, V> contents) {

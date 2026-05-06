@@ -382,7 +382,7 @@ public final class Starlark {
       return "list";
     } else if (Tuple.class.isAssignableFrom(c)) {
       return "tuple";
-    } else if (c.equals(Dict.class)) {
+    } else if (Dict.class.isAssignableFrom(c)) {
       return "dict";
     } else if (c.equals(NoneType.class)) {
       return "NoneType";
