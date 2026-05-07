@@ -20,7 +20,6 @@ import org.junit.runners.Suite;
 @RunWith(Suite.class)
 @Suite.SuiteClasses({
   DynamicTypeCheckTest.class,
-  CompactImmutableDictTest.class,
   EvaluationTest.class,
   EvalUtilsTest.class,
   FunctionTest.class,

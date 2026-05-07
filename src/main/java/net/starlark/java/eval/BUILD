@@ -17,7 +17,6 @@ java_library(
     srcs = [
         "BuiltinFunction.java",
         "CallUtils.java",
-        "CompactImmutableDict.java",
         "CpuProfiler.java",
         "Debug.java",
         "Dict.java",
