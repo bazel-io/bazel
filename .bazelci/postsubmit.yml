@@ -1,4 +1,5 @@
 ---
+check_docs: 1
 tasks:
   rockylinux8:
     shell_commands:
