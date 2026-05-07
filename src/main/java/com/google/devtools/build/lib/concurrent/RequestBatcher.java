@@ -21,7 +21,7 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.devtools.build.lib.concurrent.PaddedAddresses.createPaddedBaseAddress;
 import static com.google.devtools.build.lib.concurrent.PaddedAddresses.getAlignedAddress;
 import static java.lang.Math.min;
-import static java.util.concurrent.Executors.newFixedThreadPool;
+import static java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
@@ -281,10 +281,7 @@ public class RequestBatcher<RequestT, ResponseT> {
 
     var batcher =
         new RequestBatcher<RequestT, ResponseT>(
-            // `maxConcurrentRequests` is the maximum level of invocation concurrency possible for
-            // the `queueDrainingExecutor`. It is possible for this to overrun, but the work is
-            // relatively lightweight and the batch round trip latency is expected to dominate.
-            /* queueDrainingExecutor= */ newFixedThreadPool(maxConcurrentRequests),
+            /* queueDrainingExecutor= */ newVirtualThreadPerTaskExecutor(),
             batchExecutionStrategy,
             maxBatchSize,
             maxConcurrentRequests,
