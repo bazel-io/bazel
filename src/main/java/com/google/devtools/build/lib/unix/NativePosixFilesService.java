@@ -17,6 +17,7 @@ package com.google.devtools.build.lib.unix;
 import com.google.devtools.build.lib.runtime.BlazeService;
 import com.google.devtools.build.lib.skybridge.SkybridgeInterface;
 import java.io.IOException;
+import javax.annotation.Nullable;
 
 /** A {@link BlazeService} providing access to POSIX filesystem calls. */
 @SkybridgeInterface
@@ -25,9 +26,11 @@ public interface NativePosixFilesService extends BlazeService {
    * Native wrapper around Linux readlink(2) call.
    *
    * @param path the file of interest
-   * @return the pathname to which the symbolic link 'path' links
-   * @throws IOException iff the readlink() call failed
+   * @return the pathname to which the symbolic link 'path' links, or {@code null} if 'path' is not
+   *     a symbolic link.
+   * @throws IOException iff the readlink() call failed for any other reason
    */
+  @Nullable
   String readlink(String path) throws IOException;
 
   /**

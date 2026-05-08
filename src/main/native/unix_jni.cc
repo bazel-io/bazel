@@ -100,10 +100,6 @@ void PostException(JNIEnv* env, int error_number, const std::string& message) {
                    // (aka EOPNOTSUPP)
       exception_classname = "java/lang/UnsupportedOperationException";
       break;
-    case EINVAL:  // Invalid argument
-      exception_classname =
-          "com/google/devtools/build/lib/unix/InvalidArgumentIOException";
-      break;
     case ELOOP:  // Too many symbolic links encountered
       exception_classname =
           "com/google/devtools/build/lib/vfs/FileSymlinkLoopException";
@@ -114,6 +110,7 @@ void PostException(JNIEnv* env, int error_number, const std::string& message) {
 #if defined(EMULTIHOP)
     case EMULTIHOP:  // Multihop attempted
 #endif
+    case EINVAL:     // Invalid argument
     case EINTR:      // Interrupted system call
     case ENOMEM:     // Out of memory
     case EPERM:      // Operation not permitted
@@ -258,6 +255,10 @@ Java_com_google_devtools_build_lib_unix_NativePosixFilesServiceImpl_readlink(
   ssize_t len;
   RESTARTABLE(readlink(path_chars, target, std::size(target) - 1), len);
   if (len == -1) {
+    if (errno == EINVAL) {
+      // Not a symlink.
+      return nullptr;
+    }
     POST_EXCEPTION_FROM_ERRNO(env, errno, path_chars);
     return nullptr;
   }
