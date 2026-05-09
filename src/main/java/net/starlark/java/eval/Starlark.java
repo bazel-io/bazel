@@ -1242,8 +1242,8 @@ public final class Starlark {
    * in which case its value is returned.
    *
    * <p>This method does not perform type tagging or static type checking. If type tagging or type
-   * checking is needed, first use {@link #typeTagAndStaticTypeCheck} to obtain a
-   * type-tagged/checked version of {@code prog}.
+   * checking is needed, first use {@link #withTypeInfo} to obtain a type-tagged/checked version of
+   * {@code prog}.
    *
    * @throws EvalException if there was a (dynamic) evaluation error.
    * @throws InterruptedException if the Java thread was interrupted during evaluation.
@@ -1280,7 +1280,30 @@ public final class Starlark {
             /* defaultValues= */ Tuple.empty(),
             /* freevars= */ Tuple.empty(),
             thread.getNextIdentityToken());
-    return Starlark.positionalOnlyCall(thread, toplevel);
+    Object result = Starlark.positionalOnlyCall(thread, toplevel);
+    if (prog.getTypeTable() != null) {
+      // For globals that don't have a declared static type, we export the value's dynamic type.
+      // We export the dynamic type of the value (rather than the inferred static type) because it's
+      // likely to be more useful to users who load() this module; they would want to type-check
+      // on the real set of fields of a Bazel struct or provider, or the real named args to a rule
+      // or macro. A module can annotate a global with a wider type to avoid exposing the dynamic
+      // type as part of its API.
+      //
+      // Exporting the dynamic type does result in one wart: the exported type might not be a
+      // subtype of the inferred static type, due to the invariance rule for mutable collections.
+      // For example, we might statically infer global X to be list[int|float] and export its
+      // value's dynamic type as list[int] - but list[int] is not a subtype of list[int|float].
+      // Since the exported values are frozen, it may be possible to fix this wart by introducing
+      // frozenlist, frozendict, etc.
+      // TODO: #27370 - Ensure this mechanism works for REPL.
+      for (int i : globalIndex) {
+        Object value = module.getGlobalByIndex(i);
+        if (value != null && module.getGlobalTypeByIndex(i) == null) {
+          module.setGlobalTypeByIndex(i, Starlark.getStarlarkType(value));
+        }
+      }
+    }
+    return result;
   }
 
   /**

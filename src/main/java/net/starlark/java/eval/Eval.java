@@ -51,6 +51,7 @@ import net.starlark.java.syntax.StarlarkType;
 import net.starlark.java.syntax.Statement;
 import net.starlark.java.syntax.StringLiteral;
 import net.starlark.java.syntax.TokenKind;
+import net.starlark.java.syntax.TypeTable;
 import net.starlark.java.syntax.Types.CallableType;
 import net.starlark.java.syntax.UnaryOperatorExpression;
 
@@ -373,17 +374,17 @@ final class Eval {
   private static void assignIdentifier(StarlarkThread.Frame fr, Identifier id, Object value) {
     Resolver.Binding bind = id.getBinding();
     switch (bind.getScope()) {
-      case LOCAL:
-        fr.locals[bind.getIndex()] = value;
-        break;
-      case CELL:
-        ((StarlarkFunction.Cell) fr.locals[bind.getIndex()]).x = value;
-        break;
-      case GLOBAL:
-        fn(fr).setGlobal(bind.getIndex(), value);
-        break;
-      default:
-        throw new IllegalStateException(bind.getScope().toString());
+      case LOCAL -> fr.locals[bind.getIndex()] = value;
+      case CELL -> ((StarlarkFunction.Cell) fr.locals[bind.getIndex()]).x = value;
+      case GLOBAL -> {
+        StarlarkFunction fn = fn(fr);
+        fn.setGlobal(bind.getIndex(), value);
+        @Nullable TypeTable typeTable = fn.getTypeTable();
+        if (typeTable != null) {
+          fn.setGlobalDeclaredType(bind.getIndex(), typeTable.getGlobalDeclaredType(bind));
+        }
+      }
+      default -> throw new IllegalStateException(bind.getScope().toString());
     }
   }
 
