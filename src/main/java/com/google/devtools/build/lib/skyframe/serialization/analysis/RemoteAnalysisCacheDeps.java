@@ -22,6 +22,8 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.devtools.build.lib.cmdline.PackageIdentifier;
 import com.google.devtools.build.lib.events.Event;
 import com.google.devtools.build.lib.events.ExtendedEventHandler;
+import com.google.devtools.build.lib.profiler.Profiler;
+import com.google.devtools.build.lib.profiler.SilentCloseable;
 import com.google.devtools.build.lib.skyframe.serialization.FingerprintValueService;
 import com.google.devtools.build.lib.skyframe.serialization.FrontierNodeVersion;
 import com.google.devtools.build.lib.skyframe.serialization.KeyValueWriter;
@@ -124,7 +126,7 @@ public class RemoteAnalysisCacheDeps
     if (future == null) {
       return null;
     }
-    try {
+    try (SilentCloseable unused = Profiler.instance().profile("resolveWithTimeout: " + what)) {
       return future.get(CLIENT_LOOKUP_TIMEOUT_SEC, SECONDS);
     } catch (ExecutionException | TimeoutException e) {
       logger.atWarning().withCause(e).log("Unable to initialize %s", what);
