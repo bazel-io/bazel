@@ -89,11 +89,13 @@ import java.time.Duration;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.LongAccumulator;
+import java.util.function.LongConsumer;
 import java.util.stream.Stream;
 
 class MetricsCollector {
@@ -564,10 +566,8 @@ class MetricsCollector {
     if (MemoryProfiler.instance().getHeapUsedMemoryAtFinish() > 0) {
       memoryMetrics.setUsedHeapSizePostBuild(MemoryProfiler.instance().getHeapUsedMemoryAtFinish());
     }
-    PostGCMemoryUseRecorder.get()
-        .getPeakPostGcHeap()
-        .map(PeakHeap::bytes)
-        .ifPresent(memoryMetrics::setPeakPostGcHeapSize);
+    setPeakHeapSize(
+        PostGCMemoryUseRecorder.get().getPeakPostGcHeap(), memoryMetrics::setPeakPostGcHeapSize);
 
     if (memoryMetrics.getPeakPostGcHeapSize() < memoryMetrics.getUsedHeapSizePostBuild()) {
       // If we just did a GC and computed the heap size, update the one we got from the GC
@@ -575,10 +575,17 @@ class MetricsCollector {
       memoryMetrics.setPeakPostGcHeapSize(memoryMetrics.getUsedHeapSizePostBuild());
     }
 
-    PostGCMemoryUseRecorder.get()
-        .getPeakPostGcHeapTenuredSpace()
-        .map(PeakHeap::bytes)
-        .ifPresent(memoryMetrics::setPeakPostGcTenuredSpaceHeapSize);
+    setPeakHeapSize(
+        PostGCMemoryUseRecorder.get().getPeakPostGcHeapTenuredSpace(),
+        memoryMetrics::setPeakPostGcTenuredSpaceHeapSize);
+
+    setPeakHeapSize(
+        PostGCMemoryUseRecorder.get().getPeakPostGcHeapDuringExecution(),
+        memoryMetrics::setPeakPostGcHeapSizeDuringExecution);
+
+    setPeakHeapSize(
+        PostGCMemoryUseRecorder.get().getPeakPostGcHeapTenuredSpaceDuringExecution(),
+        memoryMetrics::setPeakPostGcTenuredSpaceHeapSizeDuringExecution);
 
     Map<String, Long> garbageStats = PostGCMemoryUseRecorder.get().getGarbageStats();
     for (Map.Entry<String, Long> garbageEntry : garbageStats.entrySet()) {
@@ -588,6 +595,10 @@ class MetricsCollector {
     }
 
     return memoryMetrics.build();
+  }
+
+  private static void setPeakHeapSize(Optional<PeakHeap> peakHeap, LongConsumer setter) {
+    peakHeap.ifPresent(peak -> setter.accept(peak.bytes()));
   }
 
   private CumulativeMetrics createCumulativeMetrics() {

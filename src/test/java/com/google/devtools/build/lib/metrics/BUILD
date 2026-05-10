@@ -20,8 +20,10 @@ java_test(
     size = "small",
     srcs = ["PostGCMemoryUseRecorderTest.java"],
     deps = [
+        "//src/main/java/com/google/devtools/build/lib/analysis:analysis_phase_complete_event",
         "//src/main/java/com/google/devtools/build/lib/bugreport",
         "//src/main/java/com/google/devtools/build/lib/metrics:memory-use-recorder",
+        "//src/main/java/com/google/devtools/build/lib/skyframe:top_level_status_events",
         "//src/test/java/com/google/devtools/build/lib/testutil",
         "//third_party:guava",
         "//third_party:jsr305",
