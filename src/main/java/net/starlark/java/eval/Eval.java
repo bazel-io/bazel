@@ -15,7 +15,10 @@
 package net.starlark.java.eval;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Maps;
 import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -636,25 +639,26 @@ final class Eval {
 
   private static Object evalDict(StarlarkThread.Frame fr, DictExpression dictexpr)
       throws EvalException, InterruptedException {
-    Dict<Object, Object> dict = Dict.of(fr.thread.mutability());
+    LinkedHashMap<Object, Object> map =
+        Maps.newLinkedHashMapWithExpectedSize(dictexpr.getEntries().size());
     for (DictExpression.Entry entry : dictexpr.getEntries()) {
       Object k = eval(fr, entry.getKey());
       Object v = eval(fr, entry.getValue());
-      int before = dict.size();
       try {
-        dict.putEntry(k, v);
+        Starlark.checkHashable(k);
       } catch (EvalException ex) {
         fr.setErrorLocation(entry.getColonLocation());
         throw ex;
       }
-      if (dict.size() == before) {
+      if (map.put(k, v) != null) {
         fr.setErrorLocation(entry.getColonLocation());
         throw Starlark.errorf(
             "dictionary expression has duplicate key: %s",
             Starlark.repr(k, fr.thread.getSemantics()));
       }
     }
-    return dict;
+    Mutability mu = fr.thread.mutability();
+    return mu.isFrozen() ? CompactImmutableDict.copyOf(map) : Dict.wrap(mu, map);
   }
 
   private static Object evalDot(StarlarkThread.Frame fr, DotExpression dot)
@@ -880,9 +884,9 @@ final class Eval {
 
   private static Object evalComprehension(StarlarkThread.Frame fr, Comprehension comp)
       throws EvalException, InterruptedException {
-    final Dict<Object, Object> dict = comp.isDict() ? Dict.of(fr.thread.mutability()) : null;
-    final StarlarkList<Object> list =
-        comp.isDict() ? null : StarlarkList.newList(fr.thread.mutability());
+    LinkedHashMap<Object, Object> map =
+        comp.isDict() ? Maps.newLinkedHashMapWithExpectedSize(1) : null;
+    List<Object> list = comp.isDict() ? null : new ArrayList<>(0);
 
     // The Lambda class serves as a recursive lambda closure.
     class Lambda {
@@ -920,25 +924,29 @@ final class Eval {
         }
 
         // base case: evaluate body and add to result.
-        if (dict != null) {
+        if (map != null) {
           DictExpression.Entry body = (DictExpression.Entry) comp.getBody();
           Object k = eval(fr, body.getKey());
           try {
             Starlark.checkHashable(k);
             Object v = eval(fr, body.getValue());
-            dict.putEntry(k, v);
+            map.put(k, v);
           } catch (EvalException ex) {
             fr.setErrorLocation(body.getColonLocation());
             throw ex;
           }
         } else {
-          list.addElement(eval(fr, ((Expression) comp.getBody())));
+          list.add(eval(fr, ((Expression) comp.getBody())));
         }
       }
     }
     new Lambda().execClauses(0);
 
-    return comp.isDict() ? dict : list;
+    Mutability mu = fr.thread.mutability();
+    if (!comp.isDict()) {
+      return StarlarkList.wrap(mu, list.toArray());
+    }
+    return mu.isFrozen() ? CompactImmutableDict.copyOf(map) : Dict.wrap(mu, map);
   }
 
   /**
