@@ -322,6 +322,8 @@ public abstract class RemoteOptions extends CommonRemoteOptions {
       help = "Whether --remote_local_fallback applies to --remote_cache.")
   public abstract boolean getRemoteLocalFallbackForRemoteCache();
 
+  public abstract void setRemoteLocalFallbackForRemoteCache(boolean value);
+
   @Deprecated
   @Option(
       name = "remote_local_fallback_strategy",
