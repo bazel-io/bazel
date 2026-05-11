@@ -188,18 +188,6 @@ public abstract class RemoteAnalysisCachingOptions extends OptionsBase {
       help = "The storage type for the remote analysis cache.")
   public abstract RemoteAnalysisCacheStorageType getStorageType();
 
-  /** The storage type for the remote analysis cache. */
-  public enum RemoteAnalysisCacheStorageType {
-    /** Write to RAM. */
-    RAM,
-
-    /** Write to HDD. */
-    HDD,
-
-    /** Write to both RAM and HDD. */
-    BOTH
-  }
-
   /** Enum converter for {@link RemoteAnalysisCacheStorageType}. */
   public static class RemoteAnalysisCacheStorageTypeConverter
       extends EnumConverter<RemoteAnalysisCacheStorageType> {

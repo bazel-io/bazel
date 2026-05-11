@@ -225,9 +225,18 @@ java_library(
 )
 
 java_library(
+    name = "remote_analysis_cache_storage_type",
+    srcs = ["RemoteAnalysisCacheStorageType.java"],
+    deps = [
+        "//src/main/java/com/google/devtools/build/lib/skybridge:skybridge_interface",
+    ],
+)
+
+java_library(
     name = "options",
     srcs = ["RemoteAnalysisCachingOptions.java"],
     deps = [
+        ":remote_analysis_cache_storage_type",
         "//src/main/java/com/google/devtools/common/options",
         "//third_party:guava",
         "//third_party:jsr305",
