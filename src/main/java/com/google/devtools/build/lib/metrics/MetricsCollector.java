@@ -76,7 +76,7 @@ import com.google.devtools.build.lib.skyframe.TopLevelStatusEvents.TopLevelTarge
 import com.google.devtools.build.lib.skyframe.serialization.FingerprintValueStore;
 import com.google.devtools.build.lib.skyframe.serialization.analysis.RemoteAnalysisCacheClient;
 import com.google.devtools.build.lib.skyframe.serialization.analysis.RemoteAnalysisCachingEventListener;
-import com.google.devtools.build.lib.util.DecimalBucketer;
+import com.google.devtools.build.lib.util.Bucket;
 import com.google.devtools.build.lib.worker.WorkerProcessMetrics;
 import com.google.devtools.build.lib.worker.WorkerProcessMetricsCollector;
 import com.google.devtools.build.lib.worker.WorkerProcessStatus;
@@ -373,7 +373,7 @@ class MetricsCollector {
     return buildMetrics.build();
   }
 
-  private Distribution computeDistributionProto(ImmutableList<DecimalBucketer.Bucket> buckets) {
+  private Distribution computeDistributionProto(ImmutableList<Bucket> buckets) {
     Distribution.Builder result = Distribution.newBuilder();
 
     for (var b : buckets) {

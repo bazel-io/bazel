@@ -17,7 +17,7 @@ package com.google.devtools.build.lib.skyframe.serialization.analysis;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.devtools.build.lib.skyframe.serialization.analysis.proto.TopLevelTargetsMatchStatus;
-import com.google.devtools.build.lib.util.DecimalBucketer;
+import com.google.devtools.build.lib.util.Bucket;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.protobuf.ByteString;
 import java.util.concurrent.ExecutionException;
@@ -44,8 +44,8 @@ public interface RemoteAnalysisCacheClient {
       long bytesReceived,
       long requestsSent,
       long batches,
-      ImmutableList<DecimalBucketer.Bucket> latencyMicros,
-      ImmutableList<DecimalBucketer.Bucket> batchLatencyMicros,
+      ImmutableList<Bucket> latencyMicros,
+      ImmutableList<Bucket> batchLatencyMicros,
       TopLevelTargetsMatchStatus matchStatus) {}
 
   Stats EMPTY_STATS =

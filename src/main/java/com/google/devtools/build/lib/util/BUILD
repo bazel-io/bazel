@@ -15,9 +15,16 @@ filegroup(
 )
 
 java_library(
+    name = "bucket",
+    srcs = ["Bucket.java"],
+    deps = ["//src/main/java/com/google/devtools/build/lib/skybridge:skybridge_interface"],
+)
+
+java_library(
     name = "decimal_bucketer",
     srcs = ["DecimalBucketer.java"],
     deps = [
+        ":bucket",
         "//third_party:guava",
     ],
 )

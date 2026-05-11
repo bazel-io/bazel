@@ -289,7 +289,7 @@ java_library(
     deps = [
         ":lookup_result",
         "//src/main/java/com/google/devtools/build/lib/skyframe/serialization/analysis/proto:analysis_cache_service_metadata_status_java_proto",
-        "//src/main/java/com/google/devtools/build/lib/util:decimal_bucketer",
+        "//src/main/java/com/google/devtools/build/lib/util:bucket",
         "//third_party:error_prone_annotations",
         "//third_party:guava",
         "@com_google_protobuf//:protobuf_java",

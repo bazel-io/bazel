@@ -20,7 +20,7 @@ import static com.google.devtools.build.lib.skyframe.serialization.WriteStatuses
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.devtools.build.lib.skyframe.serialization.WriteStatuses.WriteStatus;
-import com.google.devtools.build.lib.util.DecimalBucketer;
+import com.google.devtools.build.lib.util.Bucket;
 import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
@@ -37,10 +37,10 @@ public interface FingerprintValueStore {
       long entriesNotFound,
       long getBatches,
       long setBatches,
-      ImmutableList<DecimalBucketer.Bucket> getLatencyMicros,
-      ImmutableList<DecimalBucketer.Bucket> setLatencyMicros,
-      ImmutableList<DecimalBucketer.Bucket> getBatchLatencyMicros,
-      ImmutableList<DecimalBucketer.Bucket> setBatchLatencyMicros) {}
+      ImmutableList<Bucket> getLatencyMicros,
+      ImmutableList<Bucket> setLatencyMicros,
+      ImmutableList<Bucket> getBatchLatencyMicros,
+      ImmutableList<Bucket> setBatchLatencyMicros) {}
 
   Stats EMPTY_STATS =
       new Stats(
