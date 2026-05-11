@@ -155,8 +155,10 @@ java_library(
     srcs = ["PathToReplaceUtils.java"],
     deps = [
         "//src/main/java/com/google/devtools/build/lib/runtime:blaze_command_cluster",
+        "//src/main/java/com/google/devtools/build/lib/vfs",
         "//src/main/protobuf:command_server_java_proto",
         "//third_party:guava",
+        "//third_party:jsr305",
         "@com_google_protobuf//:protobuf_java",
     ],
 )
