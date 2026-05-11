@@ -50,6 +50,7 @@ import com.google.devtools.build.lib.profiler.ProfilerTask;
 import com.google.devtools.build.lib.remote.util.AsyncTaskCache;
 import com.google.devtools.build.lib.util.TempPathGenerator;
 import com.google.devtools.build.lib.vfs.FileSymlinkLoopException;
+import com.google.devtools.build.lib.vfs.FileSystem;
 import com.google.devtools.build.lib.vfs.FileSystemUtils;
 import com.google.devtools.build.lib.vfs.OutputPermissions;
 import com.google.devtools.build.lib.vfs.Path;
@@ -544,12 +545,12 @@ public abstract class AbstractActionInputPrefetcher implements ActionInputPrefet
     while (path.isSymbolicLink() && maxAttempt-- > 0) {
       var resolvedPath = resolveOneSymlink(path);
       if (resolvedPath.asFragment().equals(path.asFragment())) {
-        throw new FileSymlinkLoopException(path.asFragment());
+        throw new FileSymlinkLoopException(path.getPathString() + FileSystem.ERR_TOO_MANY_SYMLINKS);
       }
       path = resolvedPath;
     }
     if (maxAttempt <= 0) {
-      throw new FileSymlinkLoopException(path.asFragment());
+      throw new FileSymlinkLoopException(path.getPathString() + FileSystem.ERR_TOO_MANY_SYMLINKS);
     }
     return path;
   }
