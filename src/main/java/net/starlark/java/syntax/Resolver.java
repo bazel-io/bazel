@@ -217,7 +217,6 @@ public final class Resolver extends NodeVisitor {
     private final int[] cellIndices;
     private final ImmutableList<Binding> freevars;
     private final ImmutableList<String> globals; // TODO(adonovan): move to Program.
-    private final boolean mutationFreeAtTopLevel;
 
     private Function(
         String name,
@@ -231,8 +230,7 @@ public final class Resolver extends NodeVisitor {
         int numKeywordOnlyParams,
         List<Binding> locals,
         List<Binding> freevars,
-        List<String> globals,
-        boolean mutationFreeAtTopLevel) {
+        List<String> globals) {
       this.name = name;
       this.location = loc;
       this.functionId = functionId;
@@ -253,7 +251,6 @@ public final class Resolver extends NodeVisitor {
       this.locals = ImmutableList.copyOf(locals);
       this.freevars = ImmutableList.copyOf(freevars);
       this.globals = ImmutableList.copyOf(globals);
-      this.mutationFreeAtTopLevel = mutationFreeAtTopLevel;
 
       // Create an index of the locals that are cells.
       int ncells = 0;
@@ -412,11 +409,6 @@ public final class Resolver extends NodeVisitor {
     public boolean isToplevel() {
       return isToplevel;
     }
-
-    /** Inverse of {@link Resolver#sawPossibleMutationAtTopLevel}. */
-    boolean isMutationFreeAtTopLevel() {
-      return mutationFreeAtTopLevel;
-    }
   }
 
   /**
@@ -527,19 +519,6 @@ public final class Resolver extends NodeVisitor {
   private int loopCount;
   private int nextBindingId = 0;
   private int nextFunctionId = 0;
-  private int functionDepth = 0;
-
-  /**
-   * A heuristic indicating whether the program being resolved contains any top-level expressions
-   * that might mutate collections (e.g., function calls, index/dot writes, or augmented
-   * assignments).
-   *
-   * <p>This is used by the runtime interpreter to safely optimize collection literals (lists,
-   * dicts) into compact, immutable implementations to save memory. If this is false after resolving
-   * the program, then any collection literals created when executing the program can be made
-   * immutable at construction time.
-   */
-  private boolean sawPossibleMutationAtTopLevel;
 
   private Resolver(
       List<SyntaxError> errors,
@@ -553,7 +532,6 @@ public final class Resolver extends NodeVisitor {
     this.module = module;
     this.options = options;
     this.docCommentsMap = docCommentsMap;
-    this.sawPossibleMutationAtTopLevel = options.allowToplevelRebinding();
   }
 
   // Formats and reports an error at the start of the specified node.
@@ -667,19 +645,6 @@ public final class Resolver extends NodeVisitor {
     }
   }
 
-  /**
-   * Returns true if the LHS of an assignment consists purely of variable bindings (identifiers or
-   * unpacked tuples/lists of identifiers). Returns false if it contains an index or dot write.
-   */
-  private static boolean isPureBinding(Expression lhs) {
-    return switch (lhs) {
-      case Identifier id -> true;
-      case ListExpression listExpr ->
-          listExpr.getElements().stream().allMatch(Resolver::isPureBinding);
-      default -> false;
-    };
-  }
-
   private void assertIsBound(Identifier id) {
     Preconditions.checkState(id.getBinding() != null, "%s expected to be bound", id.getName());
   }
@@ -714,12 +679,6 @@ public final class Resolver extends NodeVisitor {
 
   @Override
   public void visit(CallExpression node) {
-    // Conservative over-approximation: any top-level call (e.g., `list.append()`) could be a
-    // mutation. Calls nested inside functions are safe to ignore, since if those functions are
-    // eventually executed during load, it must be via a top-level call in the caller's file.
-    if (functionDepth == 0) {
-      sawPossibleMutationAtTopLevel = true;
-    }
     // validate call arguments
     boolean seenVarargs = false;
     boolean seenKwargs = false;
@@ -875,11 +834,6 @@ public final class Resolver extends NodeVisitor {
 
   @Override
   public void visit(AssignmentStatement node) {
-    // Augmented assignments (e.g. `+=`) and non-pure bindings (e.g. index or dot writes) mutate
-    // objects in-place. If nested inside a function body, they are safe to ignore.
-    if (functionDepth == 0 && !sawPossibleMutationAtTopLevel) {
-      sawPossibleMutationAtTopLevel = node.isAugmented() || !isPureBinding(node.getLHS());
-    }
     visit(node.getRHS());
 
     // Disallow: [e, ...] += rhs
@@ -1137,9 +1091,7 @@ public final class Resolver extends NodeVisitor {
     }
 
     createBindingsForBlock(body);
-    functionDepth++;
     visitAll(body);
-    functionDepth--;
     popLocalBlock();
 
     return new Function(
@@ -1154,8 +1106,7 @@ public final class Resolver extends NodeVisitor {
         numKeywordOnlyParams,
         frame,
         freevars,
-        globals,
-        /* mutationFree= */ false);
+        globals);
   }
 
   private void bindParam(ImmutableList.Builder<Parameter> params, Parameter param) {
@@ -1353,8 +1304,7 @@ public final class Resolver extends NodeVisitor {
             /* numKeywordOnlyParams= */ 0,
             frame,
             /* freevars= */ ImmutableList.of(),
-            r.globals,
-            !r.sawPossibleMutationAtTopLevel));
+            r.globals));
   }
 
   /**
@@ -1394,8 +1344,7 @@ public final class Resolver extends NodeVisitor {
         /* numKeywordOnlyParams= */ 0,
         frame,
         /* freevars= */ ImmutableList.of(),
-        r.globals,
-        !r.sawPossibleMutationAtTopLevel);
+        r.globals);
   }
 
   private void pushLocalBlock(

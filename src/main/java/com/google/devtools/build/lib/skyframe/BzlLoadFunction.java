@@ -1372,10 +1372,7 @@ public class BzlLoadFunction implements SkyFunction {
       Label.RepoMappingRecorder repoMappingRecorder)
       throws BzlLoadFailedException, InterruptedException {
     Label label = key.getLabel();
-    try (Mutability mu =
-        prog.isMutationFreeAtTopLevel()
-            ? Mutability.IMMUTABLE
-            : Mutability.create("loading", label)) {
+    try (Mutability mu = Mutability.create("loading", label)) {
       StarlarkThread thread =
           StarlarkThread.create(
               mu, starlarkSemantics, /* contextDescription= */ "", SymbolGenerator.create(key));
