@@ -110,6 +110,17 @@ public final class Program {
   }
 
   /**
+   * Returns true if this program does not contain any top-level expressions that could mutate
+   * collections (e.g., calls, index assignments, or augmented assignments).
+   *
+   * <p>This is a heuristic used by the evaluator to safely optimize collection literals (lists and
+   * dicts) into compact, immutable implementations to save memory.
+   */
+  public boolean isMutationFreeAtTopLevel() {
+    return body.isMutationFreeAtTopLevel();
+  }
+
+  /**
    * Returns the static type table of this compiled program, or null if type resolution was not
    * performed.
    */
