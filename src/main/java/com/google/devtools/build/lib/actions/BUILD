@@ -42,7 +42,6 @@ java_library(
         "ActionContextMarker.java",
         "ActionEnvironment.java",
         "ActionExecutedEvent.java",
-        "ActionExecutionStatusReporter.java",
         "ActionGraph.java",
         "ActionGraphVisitor.java",
         "ActionInputMap.java",
@@ -135,7 +134,6 @@ java_library(
         ":virtual_action_input",
         "//src/main/java/com/google/devtools/build/lib/analysis/config:core_options",
         "//src/main/java/com/google/devtools/build/lib/analysis/platform",
-        "//src/main/java/com/google/devtools/build/lib/bugreport",
         "//src/main/java/com/google/devtools/build/lib/buildeventstream",
         "//src/main/java/com/google/devtools/build/lib/buildeventstream/proto:build_event_stream_java_proto",
         "//src/main/java/com/google/devtools/build/lib/clock",
@@ -177,6 +175,22 @@ java_library(
         "//third_party:jsr305",
         "@com_google_protobuf//:protobuf_java",
         "@remoteapis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+    ],
+)
+
+java_library(
+    name = "action_execution_status_reporter",
+    srcs = ["ActionExecutionStatusReporter.java"],
+    deps = [
+        ":action_input_prefetcher",
+        ":actions",
+        "//src/main/java/com/google/devtools/build/lib/bugreport",
+        "//src/main/java/com/google/devtools/build/lib/clock",
+        "//src/main/java/com/google/devtools/build/lib/concurrent:thread_safety",
+        "//src/main/java/com/google/devtools/build/lib/events",
+        "//src/main/java/com/google/devtools/build/lib/util",
+        "//third_party:guava",
+        "//third_party:jsr305",
     ],
 )
 
