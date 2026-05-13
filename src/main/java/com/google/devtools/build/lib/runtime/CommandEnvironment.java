@@ -42,6 +42,7 @@ import com.google.devtools.build.lib.clock.Clock;
 import com.google.devtools.build.lib.cmdline.Label;
 import com.google.devtools.build.lib.concurrent.QuiescingExecutors;
 import com.google.devtools.build.lib.events.Event;
+import com.google.devtools.build.lib.events.EventBusEventHandler;
 import com.google.devtools.build.lib.events.Reporter;
 import com.google.devtools.build.lib.exec.SingleBuildFileCache;
 import com.google.devtools.build.lib.pkgcache.PackageManager;
@@ -247,7 +248,7 @@ public class CommandEnvironment {
     this.runtime = runtime;
     this.workspace = workspace;
     this.directories = workspace.getDirectories();
-    this.reporter = new Reporter(eventBus);
+    this.reporter = new Reporter(new EventBusEventHandler(eventBus));
     this.eventBus = eventBus;
     this.commandThread = commandThread;
     this.command = command;
