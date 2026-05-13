@@ -23,6 +23,7 @@ import com.google.common.truth.IterableSubject;
 import com.google.devtools.build.lib.actions.Action;
 import com.google.devtools.build.lib.actions.ActionAnalysisMetadata;
 import com.google.devtools.build.lib.actions.Artifact;
+import com.google.devtools.build.lib.actions.PathMapper;
 import com.google.devtools.build.lib.actions.util.ActionsTestUtil;
 import com.google.devtools.build.lib.analysis.AnalysisUtils;
 import com.google.devtools.build.lib.analysis.ConfiguredTarget;
@@ -1507,11 +1508,12 @@ public class CcCommonTest extends BuildViewTestCase {
             "--experimental_override_name_platform_in_output_dir=%s=k8",
             TestConstants.PLATFORM_LABEL));
     CppCompileAction cppCompileAction = getCppCompileAction("//a:foo");
+    PathFragment paramFilePath = PathFragment.create("foo/bar/bar.o.params");
     assertThat(
-            cppCompileAction.getArguments().stream()
+            cppCompileAction.getArguments(paramFilePath, PathMapper.NOOP).stream()
                 .map(x -> removeOutDirectory(x))
                 .collect(ImmutableList.toImmutableList()))
-        .containsExactly("/usr/bin/mock-gcc", "@/k8-fastbuild/bin/a/_objs/foo/foo.o.params");
+        .containsExactly("/usr/bin/mock-gcc", "@foo/bar/bar.o.params");
   }
 
   @Test

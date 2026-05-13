@@ -1007,20 +1007,20 @@ public class CppCompileAction extends AbstractAction
 
   @Override
   public List<String> getArguments() throws CommandLineExpansionException {
-    return getArguments(PathMapper.NOOP);
+    return compileCommandLine.getArguments(
+        /* parameterFilePath= */ null, getOverwrittenVariables(), PathMapper.NOOP);
   }
 
-  private List<String> getArguments(PathMapper pathMapper) throws CommandLineExpansionException {
+  @VisibleForTesting
+  List<String> getArguments(PathFragment paramFilePath, PathMapper pathMapper)
+      throws CommandLineExpansionException {
     return compileCommandLine.getArguments(paramFilePath, getOverwrittenVariables(), pathMapper);
   }
 
   @Override
   public Sequence<String> getStarlarkArgv() throws EvalException {
     try {
-      return StarlarkList.immutableCopyOf(
-          compileCommandLine.getArguments(
-              /* parameterFilePath= */ null, getOverwrittenVariables(), PathMapper.NOOP));
-
+      return StarlarkList.immutableCopyOf(getArguments());
     } catch (CommandLineExpansionException ex) {
       throw new EvalException(ex);
     }
@@ -1740,7 +1740,7 @@ public class CppCompileAction extends AbstractAction
     try {
       return new SimpleSpawn(
           this,
-          ImmutableList.copyOf(getArguments(pathMapper)),
+          ImmutableList.copyOf(getArguments(paramFilePath, pathMapper)),
           getEffectiveEnvironment(clientEnv, pathMapper),
           executionInfo.buildOrThrow(),
           inputs,
@@ -2004,7 +2004,7 @@ public class CppCompileAction extends AbstractAction
     // The first element in getArguments() is actually the command to execute.
     String legend = "  Command: ";
     try {
-      for (String argument : ShellEscaper.escapeAll(getArguments(PathMapper.NOOP))) {
+      for (String argument : ShellEscaper.escapeAll(getArguments())) {
         message.append(legend);
         message.append(argument);
         message.append('\n');
